@@ -1,0 +1,88 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>GetUserMedia实例</title>
+</head>
+
+<body>
+    <video id="video" autoplay></video>
+</body>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js"></script>
+<script type="text/javascript">
+
+    var videoPlay = document.getElementById('video');
+    //使用Google的stun服务器
+    var iceServer = {
+        "iceServers": [{
+            "url": "stun:stun.l.google.com:19302"
+        }]
+    };
+    //兼容浏览器的getUserMedia写法
+    var getUserMedia = (navigator.getUserMedia ||
+        navigator.webkitGetUserMedia ||
+        navigator.mozGetUserMedia ||
+        navigator.msGetUserMedia);
+    //兼容浏览器的PeerConnection写法
+    var PeerConnection = (window.PeerConnection ||
+        window.webkitPeerConnection00 ||
+        window.webkitRTCPeerConnection ||
+        window.mozRTCPeerConnection);
+
+
+    // 创建websocket连接
+    var socket = io("ws://localhost:8888");
+    //创建PeerConnection实例
+    var pc = new PeerConnection(iceServer);
+    //发送ICE候选到其他客户端
+    pc.onicecandidate = function (event) {
+        console.log("网络候选-主播方")
+        console.log(event);
+        if (event.candidate) {
+            socket.emit('ice_candidate_live', { "data": event.candidate })
+        }
+    }
+
+    //获取本地的媒体流，并绑定到一个video标签上输出，并且发送这个媒体流给其他客户端
+    getUserMedia.call(navigator, {
+        "audio": true,
+        "video": true
+    }, function (stream) {
+        //绑定本地媒体流到video标签用于输出
+        videoPlay.src = URL.createObjectURL(stream);
+        //向PeerConnection中加入需要发送的流
+        pc.addStream(stream);
+        //发送方 发送一个offer信令
+        pc.createOffer().then(function (offer) {
+            return pc.setLocalDescription(offer);
+        }).then(function () {
+            socket.emit('liveGroup', { index: 666, liveOffer: pc.localDescription }); //加入直播组
+            console.log("直播房间号666发出offer");
+        }).catch(function () {
+            console.log("失败");
+        })
+         
+    }, function (error) {
+        //处理媒体流创建失败错误
+    });
+
+
+
+
+    //处理到来的信令
+    socket.on('receiveAnswer', function (data) {
+        pc.setRemoteDescription(new RTCSessionDescription(data));
+        console.log('我收到了answer了')
+    })
+
+    socket.on('watch_ice', function (data) {
+        pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+    })
+
+
+</script>
+
+
+</html>

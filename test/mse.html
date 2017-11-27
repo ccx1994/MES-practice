@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<style>
+    video {
+        width: 50%;
+        height: 50%;
+    }
+</style>
+
+<body>
+    <!-- <video id="vv" controls="controls"></video> -->
+    <video id="video" controls="controls"></video>
+    <script type="text/javascript">
+        var video = document.querySelector('video');
+        var assetURL = 'media3.webm';
+        // Need to be specific for Blink regarding codecs
+        // ./mp4info frag_bunny.mp4 | grep Codec
+        var mimeCodec = 'video/webm;codecs="vorbis,vp8"';
+
+        if(MediaSource != undefined && MediaSource.isTypeSupported(mimeCodec)){
+            var mediaSource = new MediaSource();
+            video.src = URL.createObjectURL(mediaSource);
+            mediaSource.addEventListener('sourceopen',sourceopen);
+        }else{
+            console.log("你的浏览器不支持MediaSource");
+        }
+
+        function sourceopen(){
+            URL.revokeObjectURL(video.src);
+            var mediaSource = this;
+            var sourceBuffer = mediaSource.addSourceBuffer(mimeCodec);
+            getMedia(assetURL,function(res){
+                sourceBuffer.addEventListener('updateend',function(){
+                    mediaSource.endOfStream();
+                    video.play();
+                })
+
+                sourceBuffer.appendBuffer(res);
+            });
+
+        }
+
+        function getMedia(url,callback){
+            var xhr = new XMLHttpRequest();
+            xhr.open('get',url);
+            xhr.responseType = "arraybuffer";
+            xhr.onload = function(){
+                callback(xhr.response);
+            }
+            xhr.send();
+        }
+        
+    </script>
+</body>
+
+
+</html>
